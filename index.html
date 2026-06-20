@@ -132,14 +132,15 @@
         let totalShots = 0;
         let currentScore = 0;
 
-        const pocketRadius = 24;
+        // Pocket Configuration Matrix (Adjusted inward slightly to prevent corner clip traps)
+        const pocketRadius = 26; // Increased slightly for realistic coverage
         const pockets = [
-            { x: 0, y: 0 },                  
-            { x: canvas.width / 2, y: 0 },   
-            { x: canvas.width, y: 0 },       
-            { x: 0, y: canvas.height },       
-            { x: canvas.width / 2, y: canvas.height }, 
-            { x: canvas.width, y: canvas.height }      
+            { x: 5, y: 5 },                          // Top Left
+            { x: canvas.width / 2, y: -2 },          // Top Middle
+            { x: canvas.width - 5, y: 5 },           // Top Right
+            { x: 5, y: canvas.height - 5 },          // Bottom Left
+            { x: canvas.width / 2, y: canvas.height + 2 }, // Bottom Middle
+            { x: canvas.width - 5, y: canvas.height - 5 }  // Bottom Right
         ];
 
         class Ball {
@@ -175,7 +176,6 @@
             }
 
             update() {
-                // Pehle friction static velocity clamp check execute hoga to avoid infinite bounce loops
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
@@ -260,11 +260,14 @@
             }
         }
 
+        // Optimized Pocket Intercept Detection Logic (Solves Corner Trap)
         function checkPocketInterceptions() {
             balls.forEach(ball => {
                 pockets.forEach(pocket => {
                     const dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
-                    if (dist < pocketRadius + 2) {
+                    
+                    // Trigger capture if ball enters pocket center radius
+                    if (dist < pocketRadius + 4) {
                         if (ball.isStriker) {
                             ball.reset();
                         } else {
@@ -371,8 +374,9 @@
                 ctx.closePath();
             }
 
-            handleBallCollisions();   
+            // Pehle pocket interception check hogi boundary se pehle takay trap na ho
             checkPocketInterceptions(); 
+            handleBallCollisions();   
 
             balls.forEach(ball => {
                 ball.update();
