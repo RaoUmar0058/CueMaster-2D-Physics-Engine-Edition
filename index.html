@@ -113,7 +113,7 @@
             </div>
             <div class="guide-item">
                 <span>📐</span>
-                <p>Vector Motion Mechanics Applied</p>
+                <p>Vector Motion & Rigid-Body Collisions Resolved natively</p>
             </div>
         </footer>
     </div>
@@ -124,6 +124,7 @@
 
         // UI Target References
         const shotsTxt = document.getElementById('shotsVal');
+        const scoreTxt = document.getElementById('scoreVal');
         const statusTxt = document.getElementById('statusTxt');
 
         // Mouse Drag Interaction State Tracking
@@ -131,10 +132,24 @@
         let mouseX = 0;
         let mouseY = 0;
         let totalShots = 0;
+        let currentScore = 0;
+
+        // Pocket Setup Positions (6 Standard Holes)
+        const pocketRadius = 24;
+        const pockets = [
+            { x: 0, y: 0 },                  // Top Left
+            { x: canvas.width / 2, y: 0 },   // Top Middle
+            { x: canvas.width, y: 0 },       // Top Right
+            { x: 0, y: canvas.height },       // Bottom Left
+            { x: canvas.width / 2, y: canvas.height }, // Bottom Middle
+            { x: canvas.width, y: canvas.height }      // Bottom Right
+        ];
 
         // 1. Universal Physics Object Template
         class Ball {
             constructor(x, y, radius, color, isStriker = false) {
+                this.startX = x; // Store initial points for respawning
+                this.startY = y;
                 this.x = x;
                 this.y = y;
                 this.radius = radius;
@@ -144,7 +159,8 @@
                 // Pure Velocity Vectors Matrix
                 this.vx = 0;
                 this.vy = 0;
-                this.friction = 0.982; // Friction simulation coefficient
+                this.friction = 0.985; // Natural smooth dampening
+                this.mass = radius;    // Mass proportional to size
             }
 
             draw() {
@@ -154,7 +170,6 @@
                 ctx.fill();
                 ctx.closePath();
 
-                // Striker Inner Indicator circle
                 if (this.isStriker) {
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, this.radius * 0.3, 0, Math.PI * 2);
@@ -172,21 +187,18 @@
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
-                // Clamp vector speeds near zero threshold to stabilize states
                 if (Math.abs(this.vx) < 0.05) this.vx = 0;
                 if (Math.abs(this.vy) < 0.05) this.vy = 0;
 
                 // Native Elastic Boundary Transformations (Wall Collisions)
-                // Left & Right Cushion hit handler
                 if (this.x - this.radius < 0) {
                     this.x = this.radius;
-                    this.vx *= -1; // Vector direction inversion
+                    this.vx *= -1;
                 } else if (this.x + this.radius > canvas.width) {
                     this.x = canvas.width - this.radius;
                     this.vx *= -1;
                 }
 
-                // Top & Bottom Cushion hit handler
                 if (this.y - this.radius < 0) {
                     this.y = this.radius;
                     this.vy *= -1;
@@ -199,6 +211,13 @@
             isStatic() {
                 return this.vx === 0 && this.vy === 0;
             }
+
+            reset() {
+                this.x = this.startX;
+                this.y = this.startY;
+                this.vx = 0;
+                this.vy = 0;
+            }
         }
 
         // Initialize Native Objects
@@ -207,7 +226,80 @@
 
         const balls = [striker, targetBall];
 
-        // 2. Vector Mouse Handling Calculations
+        // 2. Pure Kinetic Rigid-Body Multi-Ball Collision Handler
+        function handleBallCollisions() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    const b1 = balls[i];
+                    const b2 = balls[j];
+
+                    // 1. Check distance between centers
+                    const dx = b2.x - b1.x;
+                    const dy = b2.y - b1.y;
+                    const distance = Math.hypot(dx, dy);
+
+                    // If distance is less than combined radii, a collision has occurred
+                    if (distance < b1.radius + b2.radius) {
+                        
+                        // Prevent overlapping by separating overlapping structures
+                        const overlap = (b1.radius + b2.radius) - distance;
+                        const nx = dx / distance; // Normal Vector X
+                        const ny = dy / distance; // Normal Vector Y
+
+                        b1.x -= nx * overlap * 0.5;
+                        b1.y -= ny * overlap * 0.5;
+                        b2.x += nx * overlap * 0.5;
+                        b2.y += ny * overlap * 0.5;
+
+                        // 2. Calculate Relative Velocity Matrix
+                        const rvx = b2.vx - b1.vx;
+                        const rvy = b2.vy - b1.vy;
+
+                        // 3. Dot product along the normal axis
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        // Only resolve if velocities are pointing towards each other
+                        if (velAlongNormal < 0) {
+                            // Coefficient of restitution (1.0 = Perfect Elastic Collision)
+                            const restitution = 0.98;
+
+                            // Calculate impulse scalar magnitude
+                            let impulse = -(1 + restitution) * velAlongNormal;
+                            impulse /= (1 / b1.mass + 1 / b2.mass);
+
+                            // Apply final 2D impulse vectors to change momentum
+                            b1.vx -= (impulse / b1.mass) * nx;
+                            b1.vy -= (impulse / b1.mass) * ny;
+                            b2.vx += (impulse / b2.mass) * nx;
+                            b2.vy += (impulse / b2.mass) * ny;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Pocket Intercept Detection Logic
+        function checkPocketInterceptions() {
+            balls.forEach(ball => {
+                pockets.forEach(pocket => {
+                    const dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
+                    // If ball falls deep enough into pocket bounds
+                    if (dist < pocketRadius + 4) {
+                        if (ball.isStriker) {
+                            // Foul! Reset striker back to start
+                            ball.reset();
+                        } else {
+                            // Target ball potted! Increase points
+                            currentScore += 100;
+                            scoreTxt.innerText = currentScore;
+                            ball.reset(); // Respawn center
+                        }
+                    }
+                });
+            });
+        }
+
+        // 4. Vector Mouse Handling Calculations
         function getCanvasMousePos(e) {
             const rect = canvas.getBoundingClientRect();
             return {
@@ -218,14 +310,11 @@
 
         canvas.addEventListener('mousedown', (e) => {
             const pos = getCanvasMousePos(e);
-            
-            // Allow drag shooting only if all balls on the board are completely stopped
             const allStopped = balls.every(b => b.isStatic());
             
             if (allStopped) {
-                // Vector distance analysis to see if clicking directly on striker
                 const dist = Math.hypot(pos.x - striker.x, pos.y - striker.y);
-                if (dist <= striker.radius * 2.5) { // Interactive radius offset
+                if (dist <= striker.radius * 2.5) {
                     isDragging = true;
                     mouseX = pos.x;
                     mouseY = pos.y;
@@ -244,12 +333,9 @@
             if (!isDragging) return;
             isDragging = false;
 
-            // Compute Shot Vector Force based on drag mechanics
             const dx = striker.x - mouseX;
             const dy = striker.y - mouseY;
-            
-            // Power multiplier scaling parameter
-            const forceMultiplier = 0.15; 
+            const forceMultiplier = 0.16; 
 
             striker.vx = dx * forceMultiplier;
             striker.vy = dy * forceMultiplier;
@@ -260,7 +346,6 @@
             }
         });
 
-        // Helper function to check state of physics engine
         function updateStatus() {
             const running = balls.some(b => !b.isStatic());
             if (running) {
@@ -272,27 +357,37 @@
             }
         }
 
-        // 3. Core Structural Physics Loop Execution
+        // 5. Core Structural Physics Loop Execution
         function engineLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Table Pockets Holes (Black Holes Layer)
+            pockets.forEach(pocket => {
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, pocketRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#111827'; // Dark pocket inner color
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#4b5563';
+                ctx.stroke();
+                ctx.closePath();
+            });
 
             // Draw Vector Cue Aim Guidance Line if interaction is active
             if (isDragging) {
                 const dx = striker.x - mouseX;
                 const dy = striker.y - mouseY;
 
-                // Render dynamic visual trajectory feedback indicator
                 ctx.beginPath();
                 ctx.moveTo(striker.x, striker.y);
-                ctx.lineTo(striker.x + dx * 2, striker.y + dy * 2); // Ahead projected view vector
+                ctx.lineTo(striker.x + dx * 2, striker.y + dy * 2); 
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.setLineDash([6, 4]); // Clean dashed styling effect
+                ctx.setLineDash([6, 4]); 
                 ctx.lineWidth = 3;
                 ctx.stroke();
                 ctx.closePath();
-                ctx.setLineDash([]); // Reset line properties
+                ctx.setLineDash([]); 
                 
-                // Draw back drag indicator handle
                 ctx.beginPath();
                 ctx.moveTo(striker.x, striker.y);
                 ctx.lineTo(mouseX, mouseY);
@@ -302,7 +397,10 @@
                 ctx.closePath();
             }
 
-            // Engine Pipeline: Update state variables and render view layers
+            // Engine Pipeline Actions
+            handleBallCollisions();   // Resolve rigid-body impacts
+            checkPocketInterceptions(); // Capture potted objects
+
             balls.forEach(ball => {
                 ball.update();
                 ball.draw();
@@ -312,7 +410,6 @@
             requestAnimationFrame(engineLoop);
         }
 
-        // Run Engine Loop
         engineLoop();
     </script>
 </body>
