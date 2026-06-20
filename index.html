@@ -178,33 +178,28 @@
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
-                // Stop small micro movements completely
                 if (Math.abs(this.vx) < 0.25) this.vx = 0;
                 if (Math.abs(this.vy) < 0.25) this.vy = 0;
 
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Hard Boundary Wall separation fix to eliminate edge collision stuck bugs
+                // Precision cushion edge adjustments
                 if (this.x - this.radius < 0) {
-                    this.x = this.radius + 0.1;
+                    this.x = this.radius;
                     this.vx = -this.vx * 0.8;
                 } else if (this.x + this.radius > canvas.width) {
-                    this.x = canvas.width - this.radius - 0.1;
+                    this.x = canvas.width - this.radius;
                     this.vx = -this.vx * 0.8;
                 }
 
                 if (this.y - this.radius < 0) {
-                    this.y = this.radius + 0.1;
+                    this.y = this.radius;
                     this.vy = -this.vy * 0.8;
                 } else if (this.y + this.radius > canvas.height) {
-                    this.y = canvas.height - this.radius - 0.1;
+                    this.y = canvas.height - this.radius;
                     this.vy = -this.vy * 0.8;
                 }
-
-                // Double check to verify complete rest
-                if (Math.abs(this.vx) < 0.01) this.vx = 0;
-                if (Math.abs(this.vy) < 0.01) this.vy = 0;
             }
 
             isStatic() {
@@ -295,7 +290,8 @@
             
             if (allStopped) {
                 const dist = Math.hypot(pos.x - striker.x, pos.y - striker.y);
-                if (dist <= striker.radius * 2.5) {
+                // Increased touch target boundary radius padding for smooth edge extraction clicks
+                if (dist <= striker.radius * 3.5) {
                     isDragging = true;
                     mouseX = pos.x;
                     mouseY = pos.y;
