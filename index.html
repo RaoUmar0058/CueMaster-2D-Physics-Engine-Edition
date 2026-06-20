@@ -132,7 +132,7 @@
         let totalShots = 0;
         let currentScore = 0;
 
-        // Perfect Pocket Setup
+        // Perfect Pockets Positioning Coordinates
         const pocketRadius = 26;
         const pockets = [
             { x: 0, y: 0 },                                  // Top Left
@@ -155,7 +155,7 @@
                 
                 this.vx = 0;
                 this.vy = 0;
-                this.friction = 0.98; // Adjusted friction for smooth stop
+                this.friction = 0.98; 
                 this.mass = 1;         
             }
 
@@ -179,28 +179,30 @@
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
-                // High threshold hard-clamp to completely destroy low-speed jittering
-                if (Math.abs(this.vx) < 0.25) this.vx = 0;
-                if (Math.abs(this.vy) < 0.25) this.vy = 0;
+                // 100% Fail-safe Hard Energy Cutoff to terminate any potential micro-shaking
+                if (Math.hypot(this.vx, this.vy) < 0.28) {
+                    this.vx = 0;
+                    this.vy = 0;
+                }
 
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Secure Boundary Physics Overrides (Prevents sticking into walls)
+                // Ultra-Secure Boundary Guards with explicit hard reset repositioning
                 if (this.x - this.radius < 0) {
                     this.x = this.radius;
-                    if (Math.abs(this.vx) > 0.25) this.vx *= -0.8; else this.vx = 0;
+                    this.vx = Math.abs(this.vx) > 0.28 ? -this.vx * 0.8 : 0;
                 } else if (this.x + this.radius > canvas.width) {
                     this.x = canvas.width - this.radius;
-                    if (Math.abs(this.vx) > 0.25) this.vx *= -0.8; else this.vx = 0;
+                    this.vx = Math.abs(this.vx) > 0.28 ? -this.vx * 0.8 : 0;
                 }
 
                 if (this.y - this.radius < 0) {
                     this.y = this.radius;
-                    if (Math.abs(this.vy) > 0.25) this.vy *= -0.8; else this.vy = 0;
+                    this.vy = Math.abs(this.vy) > 0.28 ? -this.vy * 0.8 : 0;
                 } else if (this.y + this.radius > canvas.height) {
                     this.y = canvas.height - this.radius;
-                    if (Math.abs(this.vy) > 0.25) this.vy *= -0.8; else this.vy = 0;
+                    this.vy = Math.abs(this.vy) > 0.28 ? -this.vy * 0.8 : 0;
                 }
             }
 
@@ -261,13 +263,11 @@
             }
         }
 
-        // Expanded Absorption Threshold to completely swallow balls near corner traps
         function checkPocketInterceptions() {
             balls.forEach(ball => {
                 pockets.forEach(pocket => {
                     const dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
                     
-                    // Increased threshold (+8) ensures that ball gets captured before any boundary loops conflict
                     if (dist < pocketRadius + 8) {
                         if (ball.isStriker) {
                             ball.reset();
@@ -375,7 +375,6 @@
                 ctx.closePath();
             }
 
-            // High Priority Routine Order
             checkPocketInterceptions(); 
             handleBallCollisions();   
 
