@@ -122,30 +122,26 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // UI Target References
         const shotsTxt = document.getElementById('shotsVal');
         const scoreTxt = document.getElementById('scoreVal');
         const statusTxt = document.getElementById('statusTxt');
 
-        // Mouse Drag Interaction State Tracking
         let isDragging = false;
         let mouseX = 0;
         let mouseY = 0;
         let totalShots = 0;
         let currentScore = 0;
 
-        // Pocket Setup Positions (6 Standard Holes)
         const pocketRadius = 24;
         const pockets = [
-            { x: 0, y: 0 },                  // Top Left
-            { x: canvas.width / 2, y: 0 },   // Top Middle
-            { x: canvas.width, y: 0 },       // Top Right
-            { x: 0, y: canvas.height },       // Bottom Left
-            { x: canvas.width / 2, y: canvas.height }, // Bottom Middle
-            { x: canvas.width, y: canvas.height }      // Bottom Right
+            { x: 0, y: 0 },                  
+            { x: canvas.width / 2, y: 0 },   
+            { x: canvas.width, y: 0 },       
+            { x: 0, y: canvas.height },       
+            { x: canvas.width / 2, y: canvas.height }, 
+            { x: canvas.width, y: canvas.height }      
         ];
 
-        // 1. Universal Physics Object Template
         class Ball {
             constructor(x, y, radius, color, isStriker = false) {
                 this.startX = x; 
@@ -156,11 +152,10 @@
                 this.color = color;
                 this.isStriker = isStriker;
                 
-                // Pure Velocity Vectors Matrix
                 this.vx = 0;
                 this.vy = 0;
-                this.friction = 0.985; // Natural smooth dampening
-                this.mass = 1;         // Equal mass normalization for uniform momentum
+                this.friction = 0.985; 
+                this.mass = 1;         
             }
 
             draw() {
@@ -180,31 +175,31 @@
             }
 
             update() {
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Continuous vector reduction via system friction
+                // Pehle friction static velocity clamp check execute hoga to avoid infinite bounce loops
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
-                if (Math.abs(this.vx) < 0.05) this.vx = 0;
-                if (Math.abs(this.vy) < 0.05) this.vy = 0;
+                if (Math.abs(this.vx) < 0.1) this.vx = 0;
+                if (Math.abs(this.vy) < 0.1) this.vy = 0;
 
-                // Native Elastic Boundary Transformations (Wall Collisions)
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wall boundary checks with safe coordinate re-mapping overrides
                 if (this.x - this.radius < 0) {
                     this.x = this.radius;
-                    this.vx *= -1;
+                    if (Math.abs(this.vx) > 0.1) this.vx *= -1; else this.vx = 0;
                 } else if (this.x + this.radius > canvas.width) {
                     this.x = canvas.width - this.radius;
-                    this.vx *= -1;
+                    if (Math.abs(this.vx) > 0.1) this.vx *= -1; else this.vx = 0;
                 }
 
                 if (this.y - this.radius < 0) {
                     this.y = this.radius;
-                    this.vy *= -1;
+                    if (Math.abs(this.vy) > 0.1) this.vy *= -1; else this.vy = 0;
                 } else if (this.y + this.radius > canvas.height) {
                     this.y = canvas.height - this.radius;
-                    this.vy *= -1;
+                    if (Math.abs(this.vy) > 0.1) this.vy *= -1; else this.vy = 0;
                 }
             }
 
@@ -220,13 +215,10 @@
             }
         }
 
-        // Initialize Native Objects
         const striker = new Ball(200, 200, 14, '#ffffff', true);
         const targetBall = new Ball(550, 200, 14, '#ef4444');
-
         const balls = [striker, targetBall];
 
-        // 2. High-Precision 2D Elastic Ball-to-Ball Collision Matrix
         function handleBallCollisions() {
             for (let i = 0; i < balls.length; i++) {
                 for (let j = i + 1; j < balls.length; j++) {
@@ -237,36 +229,28 @@
                     const dy = b2.y - b1.y;
                     const distance = Math.hypot(dx, dy);
 
-                    // Dynamic overlap calculation condition
                     if (distance < b1.radius + b2.radius) {
-                        
-                        // Normal Vectors
                         const nx = dx / distance;
                         const ny = dy / distance;
 
-                        // 1. Immediate position correction matrix to completely solve sticking/freezing
                         const overlap = (b1.radius + b2.radius) - distance;
-                        b1.x -= nx * (overlap * 0.51); // Slight scaling injection to prevent clipping re-triggers
+                        b1.x -= nx * (overlap * 0.51); 
                         b1.y -= ny * (overlap * 0.51);
                         b2.x += nx * (overlap * 0.51);
                         b2.y += ny * (overlap * 0.51);
 
-                        // 2. Tangent Vector calculation
                         const tx = -ny;
                         const ty = nx;
 
-                        // 3. Project velocities onto normal and tangent vectors
                         const v1n = b1.vx * nx + b1.vy * ny;
                         const v1t = b1.vx * tx + b1.vy * ty;
                         const v2n = b2.vx * nx + b2.vy * ny;
                         const v2t = b2.vx * tx + b2.vy * ty;
 
-                        // 4. Elastic Conservation of Momentum equation for new normal velocities
-                        const restitution = 0.95; // Kinetic rebound factor
+                        const restitution = 0.95; 
                         const v1nPrime = (v1n * (b1.mass - b2.mass) + 2 * b2.mass * v2n) / (b1.mass + b2.mass) * restitution;
                         const v2nPrime = (v2n * (b2.mass - b1.mass) + 2 * b1.mass * v1n) / (b1.mass + b2.mass) * restitution;
 
-                        // 5. Transform scalar components back into coordinate vectors
                         b1.vx = v1nPrime * nx + v1t * tx;
                         b1.vy = v1nPrime * ny + v1t * ty;
                         b2.vx = v2nPrime * nx + v2t * tx;
@@ -276,7 +260,6 @@
             }
         }
 
-        // 3. Pocket Intercept Detection Logic
         function checkPocketInterceptions() {
             balls.forEach(ball => {
                 pockets.forEach(pocket => {
@@ -294,7 +277,6 @@
             });
         }
 
-        // 4. Vector Mouse Handling Calculations
         function getCanvasMousePos(e) {
             const rect = canvas.getBoundingClientRect();
             return {
@@ -352,11 +334,9 @@
             }
         }
 
-        // 5. Core Structural Physics Loop Execution
         function engineLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Table Pockets Holes (Black Holes Layer)
             pockets.forEach(pocket => {
                 ctx.beginPath();
                 ctx.arc(pocket.x, pocket.y, pocketRadius, 0, Math.PI * 2);
@@ -368,7 +348,6 @@
                 ctx.closePath();
             });
 
-            // Draw Vector Cue Aim Guidance Line if interaction is active
             if (isDragging) {
                 const dx = striker.x - mouseX;
                 const dy = striker.y - mouseY;
@@ -392,7 +371,6 @@
                 ctx.closePath();
             }
 
-            // Engine Pipeline Actions
             handleBallCollisions();   
             checkPocketInterceptions(); 
 
