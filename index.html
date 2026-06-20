@@ -132,15 +132,15 @@
         let totalShots = 0;
         let currentScore = 0;
 
-        // Pocket Configuration Matrix (Adjusted inward slightly to prevent corner clip traps)
-        const pocketRadius = 26; // Increased slightly for realistic coverage
+        // Pocket System Parameters Re-aligned perfectly to match physics boundaries
+        const pocketRadius = 26;
         const pockets = [
-            { x: 5, y: 5 },                          // Top Left
-            { x: canvas.width / 2, y: -2 },          // Top Middle
-            { x: canvas.width - 5, y: 5 },           // Top Right
-            { x: 5, y: canvas.height - 5 },          // Bottom Left
-            { x: canvas.width / 2, y: canvas.height + 2 }, // Bottom Middle
-            { x: canvas.width - 5, y: canvas.height - 5 }  // Bottom Right
+            { x: 0, y: 0 },                                  // Top Left
+            { x: canvas.width / 2, y: -2 },                  // Top Middle
+            { x: canvas.width, y: 0 },                       // Top Right
+            { x: 0, y: canvas.height },                      // Bottom Left
+            { x: canvas.width / 2, y: canvas.height + 2 },   // Bottom Middle
+            { x: canvas.width, y: canvas.height }            // Bottom Right
         ];
 
         class Ball {
@@ -185,7 +185,7 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Wall boundary checks with safe coordinate re-mapping overrides
+                // Wall boundary check with safe cushion padding parameters
                 if (this.x - this.radius < 0) {
                     this.x = this.radius;
                     if (Math.abs(this.vx) > 0.1) this.vx *= -1; else this.vx = 0;
@@ -260,14 +260,14 @@
             }
         }
 
-        // Optimized Pocket Intercept Detection Logic (Solves Corner Trap)
+        // Pocket Intercept Detection with Expanded Margin Matrix to eliminate clipping
         function checkPocketInterceptions() {
             balls.forEach(ball => {
                 pockets.forEach(pocket => {
                     const dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
                     
-                    // Trigger capture if ball enters pocket center radius
-                    if (dist < pocketRadius + 4) {
+                    // Safe dynamic margin check - absorbs ball before it hits raw wall canvas bounds
+                    if (dist < pocketRadius + 6) {
                         if (ball.isStriker) {
                             ball.reset();
                         } else {
@@ -374,7 +374,7 @@
                 ctx.closePath();
             }
 
-            // Pehle pocket interception check hogi boundary se pehle takay trap na ho
+            // High Priority Loop Order
             checkPocketInterceptions(); 
             handleBallCollisions();   
 
