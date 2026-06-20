@@ -20,7 +20,7 @@
 
 Instead of relying on open-source physics libraries (like Matter.js or P5.js), this project features a **natively coded rigid-body physics engine**. It showcases advanced rendering architecture, matrix coordinate manipulation, and rigorous vector mathematics to handle mass and velocity transformations in real time.
 
-👉 **[Click Here to Play the Live Demo](cue-master-2-d-physics-engine-editi.vercel.app)**
+👉 **[Click Here to Play the Live Demo](https://cue-master-2-d-physics-engine-editi.vercel.app)
 
 ---
 
