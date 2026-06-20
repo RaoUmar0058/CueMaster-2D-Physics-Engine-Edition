@@ -148,7 +148,7 @@
         // 1. Universal Physics Object Template
         class Ball {
             constructor(x, y, radius, color, isStriker = false) {
-                this.startX = x; // Store initial points for respawning
+                this.startX = x; 
                 this.startY = y;
                 this.x = x;
                 this.y = y;
@@ -160,7 +160,7 @@
                 this.vx = 0;
                 this.vy = 0;
                 this.friction = 0.985; // Natural smooth dampening
-                this.mass = radius;    // Mass proportional to size
+                this.mass = 1;         // Equal mass normalization for uniform momentum
             }
 
             draw() {
@@ -226,53 +226,51 @@
 
         const balls = [striker, targetBall];
 
-        // 2. Pure Kinetic Rigid-Body Multi-Ball Collision Handler
+        // 2. High-Precision 2D Elastic Ball-to-Ball Collision Matrix
         function handleBallCollisions() {
             for (let i = 0; i < balls.length; i++) {
                 for (let j = i + 1; j < balls.length; j++) {
                     const b1 = balls[i];
                     const b2 = balls[j];
 
-                    // 1. Check distance between centers
                     const dx = b2.x - b1.x;
                     const dy = b2.y - b1.y;
                     const distance = Math.hypot(dx, dy);
 
-                    // If distance is less than combined radii, a collision has occurred
+                    // Dynamic overlap calculation condition
                     if (distance < b1.radius + b2.radius) {
                         
-                        // Prevent overlapping by separating overlapping structures
+                        // Normal Vectors
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+
+                        // 1. Immediate position correction matrix to completely solve sticking/freezing
                         const overlap = (b1.radius + b2.radius) - distance;
-                        const nx = dx / distance; // Normal Vector X
-                        const ny = dy / distance; // Normal Vector Y
+                        b1.x -= nx * (overlap * 0.51); // Slight scaling injection to prevent clipping re-triggers
+                        b1.y -= ny * (overlap * 0.51);
+                        b2.x += nx * (overlap * 0.51);
+                        b2.y += ny * (overlap * 0.51);
 
-                        b1.x -= nx * overlap * 0.5;
-                        b1.y -= ny * overlap * 0.5;
-                        b2.x += nx * overlap * 0.5;
-                        b2.y += ny * overlap * 0.5;
+                        // 2. Tangent Vector calculation
+                        const tx = -ny;
+                        const ty = nx;
 
-                        // 2. Calculate Relative Velocity Matrix
-                        const rvx = b2.vx - b1.vx;
-                        const rvy = b2.vy - b1.vy;
+                        // 3. Project velocities onto normal and tangent vectors
+                        const v1n = b1.vx * nx + b1.vy * ny;
+                        const v1t = b1.vx * tx + b1.vy * ty;
+                        const v2n = b2.vx * nx + b2.vy * ny;
+                        const v2t = b2.vx * tx + b2.vy * ty;
 
-                        // 3. Dot product along the normal axis
-                        const velAlongNormal = rvx * nx + rvy * ny;
+                        // 4. Elastic Conservation of Momentum equation for new normal velocities
+                        const restitution = 0.95; // Kinetic rebound factor
+                        const v1nPrime = (v1n * (b1.mass - b2.mass) + 2 * b2.mass * v2n) / (b1.mass + b2.mass) * restitution;
+                        const v2nPrime = (v2n * (b2.mass - b1.mass) + 2 * b1.mass * v1n) / (b1.mass + b2.mass) * restitution;
 
-                        // Only resolve if velocities are pointing towards each other
-                        if (velAlongNormal < 0) {
-                            // Coefficient of restitution (1.0 = Perfect Elastic Collision)
-                            const restitution = 0.98;
-
-                            // Calculate impulse scalar magnitude
-                            let impulse = -(1 + restitution) * velAlongNormal;
-                            impulse /= (1 / b1.mass + 1 / b2.mass);
-
-                            // Apply final 2D impulse vectors to change momentum
-                            b1.vx -= (impulse / b1.mass) * nx;
-                            b1.vy -= (impulse / b1.mass) * ny;
-                            b2.vx += (impulse / b2.mass) * nx;
-                            b2.vy += (impulse / b2.mass) * ny;
-                        }
+                        // 5. Transform scalar components back into coordinate vectors
+                        b1.vx = v1nPrime * nx + v1t * tx;
+                        b1.vy = v1nPrime * ny + v1t * ty;
+                        b2.vx = v2nPrime * nx + v2t * tx;
+                        b2.vy = v2nPrime * ny + v2t * ty;
                     }
                 }
             }
@@ -283,16 +281,13 @@
             balls.forEach(ball => {
                 pockets.forEach(pocket => {
                     const dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
-                    // If ball falls deep enough into pocket bounds
-                    if (dist < pocketRadius + 4) {
+                    if (dist < pocketRadius + 2) {
                         if (ball.isStriker) {
-                            // Foul! Reset striker back to start
                             ball.reset();
                         } else {
-                            // Target ball potted! Increase points
                             currentScore += 100;
                             scoreTxt.innerText = currentScore;
-                            ball.reset(); // Respawn center
+                            ball.reset(); 
                         }
                     }
                 });
@@ -365,7 +360,7 @@
             pockets.forEach(pocket => {
                 ctx.beginPath();
                 ctx.arc(pocket.x, pocket.y, pocketRadius, 0, Math.PI * 2);
-                ctx.fillStyle = '#111827'; // Dark pocket inner color
+                ctx.fillStyle = '#111827'; 
                 ctx.fill();
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = '#4b5563';
@@ -398,8 +393,8 @@
             }
 
             // Engine Pipeline Actions
-            handleBallCollisions();   // Resolve rigid-body impacts
-            checkPocketInterceptions(); // Capture potted objects
+            handleBallCollisions();   
+            checkPocketInterceptions(); 
 
             balls.forEach(ball => {
                 ball.update();
