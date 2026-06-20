@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CueMaster 2D: Physics Engine Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #16161a;
+            color: #fffffe;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            width: 100%;
+            max-width: 840px;
+            padding: 20px;
+        }
+
+        .game-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+            color: #34d399;
+        }
+
+        .badge {
+            background-color: #047857;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #242629;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .stat-box {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .stat-box span {
+            color: #34d399;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        canvas {
+            background-color: #0f766e; /* Premium Pool felt color */
+            border: 16px solid #78350f; /* Solid wooden rails */
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        .controls-guide {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .guide-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <header class="game-header">
+            <h1>CueMaster 2D</h1>
+            <span class="badge">Custom 2D Physics Engine</span>
+        </header>
+
+        <div class="scoreboard">
+            <div class="stat-box">Score: <span id="scoreVal">0</span></div>
+            <div class="stat-box">Shots: <span id="shotsVal">0</span></div>
+            <div class="stat-box">Engine Status: <span id="statusTxt">Ready</span></div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+        </div>
+
+        <footer class="controls-guide">
+            <div class="guide-item">
+                <span>🖱️</span>
+                <p><strong>Controls:</strong> Drag backward from white ball to aim, release to shoot.</p>
+            </div>
+            <div class="guide-item">
+                <span>📐</span>
+                <p>Vector Motion Mechanics Applied</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Target References
+        const shotsTxt = document.getElementById('shotsVal');
+        const statusTxt = document.getElementById('statusTxt');
+
+        // Mouse Drag Interaction State Tracking
+        let isDragging = false;
+        let mouseX = 0;
+        let mouseY = 0;
+        let totalShots = 0;
+
+        // 1. Universal Physics Object Template
+        class Ball {
+            constructor(x, y, radius, color, isStriker = false) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.isStriker = isStriker;
+                
+                // Pure Velocity Vectors Matrix
+                this.vx = 0;
+                this.vy = 0;
+                this.friction = 0.982; // Friction simulation coefficient
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+
+                // Striker Inner Indicator circle
+                if (this.isStriker) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.3, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Continuous vector reduction via system friction
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+
+                // Clamp vector speeds near zero threshold to stabilize states
+                if (Math.abs(this.vx) < 0.05) this.vx = 0;
+                if (Math.abs(this.vy) < 0.05) this.vy = 0;
+
+                // Native Elastic Boundary Transformations (Wall Collisions)
+                // Left & Right Cushion hit handler
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -1; // Vector direction inversion
+                } else if (this.x + this.radius > canvas.width) {
+                    this.x = canvas.width - this.radius;
+                    this.vx *= -1;
+                }
+
+                // Top & Bottom Cushion hit handler
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -1;
+                } else if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.vy *= -1;
+                }
+            }
+
+            isStatic() {
+                return this.vx === 0 && this.vy === 0;
+            }
+        }
+
+        // Initialize Native Objects
+        const striker = new Ball(200, 200, 14, '#ffffff', true);
+        const targetBall = new Ball(550, 200, 14, '#ef4444');
+
+        const balls = [striker, targetBall];
+
+        // 2. Vector Mouse Handling Calculations
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getCanvasMousePos(e);
+            
+            // Allow drag shooting only if all balls on the board are completely stopped
+            const allStopped = balls.every(b => b.isStatic());
+            
+            if (allStopped) {
+                // Vector distance analysis to see if clicking directly on striker
+                const dist = Math.hypot(pos.x - striker.x, pos.y - striker.y);
+                if (dist <= striker.radius * 2.5) { // Interactive radius offset
+                    isDragging = true;
+                    mouseX = pos.x;
+                    mouseY = pos.y;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const pos = getCanvasMousePos(e);
+            mouseX = pos.x;
+            mouseY = pos.y;
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            // Compute Shot Vector Force based on drag mechanics
+            const dx = striker.x - mouseX;
+            const dy = striker.y - mouseY;
+            
+            // Power multiplier scaling parameter
+            const forceMultiplier = 0.15; 
+
+            striker.vx = dx * forceMultiplier;
+            striker.vy = dy * forceMultiplier;
+
+            if (striker.vx !== 0 || striker.vy !== 0) {
+                totalShots++;
+                shotsTxt.innerText = totalShots;
+            }
+        });
+
+        // Helper function to check state of physics engine
+        function updateStatus() {
+            const running = balls.some(b => !b.isStatic());
+            if (running) {
+                statusTxt.innerText = "Simulating Physics...";
+                statusTxt.style.color = "#f59e0b";
+            } else {
+                statusTxt.innerText = "Ready";
+                statusTxt.style.color = "#34d399";
+            }
+        }
+
+        // 3. Core Structural Physics Loop Execution
+        function engineLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Vector Cue Aim Guidance Line if interaction is active
+            if (isDragging) {
+                const dx = striker.x - mouseX;
+                const dy = striker.y - mouseY;
+
+                // Render dynamic visual trajectory feedback indicator
+                ctx.beginPath();
+                ctx.moveTo(striker.x, striker.y);
+                ctx.lineTo(striker.x + dx * 2, striker.y + dy * 2); // Ahead projected view vector
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.setLineDash([6, 4]); // Clean dashed styling effect
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.closePath();
+                ctx.setLineDash([]); // Reset line properties
+                
+                // Draw back drag indicator handle
+                ctx.beginPath();
+                ctx.moveTo(striker.x, striker.y);
+                ctx.lineTo(mouseX, mouseY);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+            }
+
+            // Engine Pipeline: Update state variables and render view layers
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            updateStatus();
+            requestAnimationFrame(engineLoop);
+        }
+
+        // Run Engine Loop
+        engineLoop();
+    </script>
+</body>
+</html>
